@@ -20,6 +20,7 @@
             height: 100vh; width: 100vw;
             display: flex; flex-direction: column; align-items: center;
             overflow: hidden; 
+            /* App-level protection */
             user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; 
             touch-action: none; 
         }
@@ -28,9 +29,10 @@
             position: fixed; top: 20px; left: 50%;
             transform: translateX(-50%) translateY(-100px);
             background: #333; color: white; padding: 12px 24px;
-            border-radius: 30px; font-weight: bold; z-index: 5000;
+            border-radius: 30px; font-weight: bold; z-index: 9999;
             transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            pointer-events: none;
         }
         #toast.show { transform: translateX(-50%) translateY(0); }
 
@@ -59,7 +61,7 @@
         .color-option.selected { border-color: #333; transform: scale(1.1); box-shadow: 0 0 8px rgba(0,0,0,0.2); }
 
         .game-board-wrapper { flex-grow: 1; display: flex; justify-content: center; align-items: center; width: 100%; min-height: 0; margin: 10px 0; }
-        .game-board { background: #fff; border: 4px solid var(--accent-wood); border-radius: 12px; position: relative; overflow: hidden; }
+        .game-board { background: #fff; border: 4px solid var(--accent-wood); border-radius: 12px; position: relative; overflow: hidden; touch-action: none; }
 
         .magnet {
             position: absolute; z-index: 10; transform: translate(-50%, -50%);
@@ -89,7 +91,7 @@
 
         button { background: var(--accent-wood); color: white; border: none; padding: 12px; border-radius: 12px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px; }
         button:disabled { opacity: 0.4; cursor: not-allowed; }
-        .game-over { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 6000; color: white; padding: 20px; }
+        .game-over { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; color: white; padding: 20px; text-align: center; }
     </style>
 </head>
 <body>
@@ -97,7 +99,7 @@
     <div id="toast">Message</div>
 
     <div class="setup-screen" id="setupScreen">
-        <h2 style="text-align:center; margin-bottom: 10px;">🧲 Magnetic Attraction</h2>
+        <h2 style="text-align:center; margin: 0 0 10px 0;">🧲 Magnetic Attraction</h2>
         <div class="player-setup" id="setupContainer"></div>
         <div style="margin-bottom: 15px;">
             <label style="font-weight:bold;">Magnets: <b id="magVal">8</b></label>
@@ -154,7 +156,8 @@
                 { name: "Player 1", color: "#ff6b6b", score: 0, magnets: 8 },
                 { name: "Player 2", color: "#4ecdc4", score: 0, magnets: 8 }
             ],
-            currentPlayer: 0, magnets: [], history: [], isAnimating: false, totalMagnets: 8, boardSize: 400, unitScale: 1
+            currentPlayer: 0, magnets: [], history: [], isAnimating: false, totalMagnets: 8, boardSize: 400, unitScale: 1,
+            lastInputTime: 0 // Secondary safety guard for ghost clicks
         };
 
         function getRad(size) { return (Math.sqrt(size) * BASE_UNIT * state.unitScale) / 2; }
@@ -199,9 +202,16 @@
                 state.players[0].magnets = state.players[1].magnets = state.totalMagnets;
                 updateUI();
                 const board = document.getElementById('gameBoard');
-                board.onclick = handleBoardClick;
-                board.onmousemove = handlePreview;
-                board.ontouchstart = (e) => { const touch = e.touches[0]; handlePreview(touch); handleBoardClick(touch); };
+                
+                // UNIFIED INPUT: Replaces click/touch with Pointer Events to stop ghost clicks
+                board.onpointerdown = (e) => {
+                    const now = Date.now();
+                    if (now - state.lastInputTime < 400) return; // Ignore microsecond double-taps
+                    state.lastInputTime = now;
+                    handlePreview(e);
+                    handleBoardClick(e);
+                };
+                board.onpointermove = handlePreview;
             }, 50);
         }
 
@@ -225,8 +235,10 @@
             if (state.isAnimating || state.players[state.currentPlayer].magnets <= 0) { ghost.style.display = aura.style.display = 'none'; return; }
             const prevEnabled = state.currentPlayer === 0 ? document.getElementById('p1PrevCheck').checked : document.getElementById('p2PrevCheck').checked;
             if (!prevEnabled) { ghost.style.display = aura.style.display = 'none'; return; }
+            
             const rect = document.getElementById('gameBoard').getBoundingClientRect();
             const x = e.clientX - rect.left, y = e.clientY - rect.top;
+            
             ghost.style.display = aura.style.display = 'block';
             ghost.style.left = aura.style.left = `${(x / state.boardSize) * 100}%`;
             ghost.style.top = aura.style.top = `${(y / state.boardSize) * 100}%`;
@@ -243,12 +255,14 @@
             const x = e.clientX - rect.left, y = e.clientY - rect.top;
             const margin = getRad(1);
             if (x < margin || x > state.boardSize - margin || y < margin || y > state.boardSize - margin) return;
+            
             saveHistory();
             const newMag = { x, y, player: state.currentPlayer, size: 1, id: Date.now() };
             resolveMove(newMag, true);
         }
 
         function resolveMove(targetMag, isInitialClick) {
+            // Commit to board so it is visible
             state.magnets.push(targetMag);
             render();
 
@@ -260,8 +274,9 @@
                 const tx = connections.reduce((s, m) => s + (m.x * m.size), 0) / totalW;
                 const ty = connections.reduce((s, m) => s + (m.y * m.size), 0) / totalW;
                 
+                // Active player triggered this, penalty assigned
                 state.players[isInitialClick ? state.currentPlayer : (state.currentPlayer === 0 ? 1 : 0)].score += totalW;
-                showToast(`Magnetic Pull! ${totalW} Magnets`);
+                showToast(`Pull! ${totalW} Magnets`);
                 
                 if (isInitialClick) {
                     state.players[state.currentPlayer].magnets--;
@@ -286,10 +301,8 @@
                 added = false;
                 for (let i = 0; i < pool.length; i++) {
                     const p = pool[i];
-                    if (group.some(g => {
-                        const dist = Math.sqrt((g.x - p.x)**2 + (g.y - p.y)**2);
-                        return dist < (getRad(g.size)*FIELD_MUL + getRad(p.size)*FIELD_MUL);
-                    })) {
+                    const dist = Math.sqrt((target.x - p.x)**2 + (target.y - p.y)**2);
+                    if (dist < (getRad(target.size)*FIELD_MUL + getRad(p.size)*FIELD_MUL)) {
                         group.push(p); pool.splice(i, 1); i--; added = true;
                     }
                 }
@@ -336,24 +349,15 @@
         }
 
         function saveHistory() { 
-            state.history.push(JSON.stringify({ 
-                players: state.players.map(p => ({...p})), 
-                currentPlayer: state.currentPlayer, 
-                magnets: state.magnets.map(m => ({...m})) 
-            })); 
+            state.history.push(JSON.stringify({ players: state.players.map(p => ({...p})), currentPlayer: state.currentPlayer, magnets: state.magnets.map(m => ({...m})) })); 
             if (state.history.length > 25) state.history.shift(); 
         }
 
         function undoMove() { 
             if (state.history.length === 0 || state.isAnimating) return; 
             const restored = JSON.parse(state.history.pop());
-            state.players = restored.players;
-            state.currentPlayer = restored.currentPlayer;
-            state.magnets = restored.magnets;
-            state.isAnimating = false;
-            render(); 
-            updateUI(); 
-            showToast("Undone");
+            state.players = restored.players; state.currentPlayer = restored.currentPlayer; state.magnets = restored.magnets;
+            state.isAnimating = false; render(); updateUI(); showToast("Undone");
         }
         
         function checkEnd() {
