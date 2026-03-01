@@ -20,7 +20,6 @@
             height: 100vh; width: 100vw;
             display: flex; flex-direction: column; align-items: center;
             overflow: hidden; 
-            /* App-level protection */
             user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; 
             touch-action: none; 
         }
@@ -38,9 +37,9 @@
 
         @keyframes vibrate {
             0% { transform: translate(0, 0); }
-            25% { transform: translate(3px, -3px); }
-            50% { transform: translate(-3px, 3px); }
-            75% { transform: translate(3px, 3px); }
+            25% { transform: translate(2px, -2px); }
+            50% { transform: translate(-2px, 2px); }
+            75% { transform: translate(2px, 2px); }
             100% { transform: translate(0, 0); }
         }
         .vibrating .mag-inner { animation: vibrate 0.08s linear infinite; }
@@ -63,17 +62,25 @@
         .game-board-wrapper { flex-grow: 1; display: flex; justify-content: center; align-items: center; width: 100%; min-height: 0; margin: 10px 0; }
         .game-board { background: #fff; border: 4px solid var(--accent-wood); border-radius: 12px; position: relative; overflow: hidden; touch-action: none; }
 
+        /* Magnet Visuals: Transition ONLY when moving */
         .magnet {
             position: absolute; z-index: 10; transform: translate(-50%, -50%);
+            /* Start with no transition to prevent "Ghost" outlines on spawn */
+            transition: none; 
+        }
+        .magnet.moving {
             transition: left 2s cubic-bezier(0.25, 0.1, 0.25, 1), top 2s cubic-bezier(0.25, 0.1, 0.25, 1);
         }
         .mag-inner {
-            width: 100%; height: 100%; border-radius: 50%; border: 2px solid rgba(0,0,0,0.2);
+            width: 100%; height: 100%; border-radius: 50%; border: 2px solid rgba(0,0,0,0.15);
             display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;
         }
 
         .magnetic-field {
             position: absolute; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); z-index: 1;
+            transition: none;
+        }
+        .magnetic-field.moving {
             transition: left 2s cubic-bezier(0.25, 0.1, 0.25, 1), top 2s cubic-bezier(0.25, 0.1, 0.25, 1), width 2s, height 2s;
         }
 
@@ -152,12 +159,9 @@
         const FIELD_MUL = 4;
 
         let state = {
-            players: [
-                { name: "Player 1", color: "#ff6b6b", score: 0, magnets: 8 },
-                { name: "Player 2", color: "#4ecdc4", score: 0, magnets: 8 }
-            ],
+            players: [{ name: "Player 1", color: "#ff6b6b", score: 0, magnets: 8 }, { name: "Player 2", color: "#4ecdc4", score: 0, magnets: 8 }],
             currentPlayer: 0, magnets: [], history: [], isAnimating: false, totalMagnets: 8, boardSize: 400, unitScale: 1,
-            lastInputTime: 0 // Secondary safety guard for ghost clicks
+            lastInputTime: 0
         };
 
         function getRad(size) { return (Math.sqrt(size) * BASE_UNIT * state.unitScale) / 2; }
@@ -202,11 +206,9 @@
                 state.players[0].magnets = state.players[1].magnets = state.totalMagnets;
                 updateUI();
                 const board = document.getElementById('gameBoard');
-                
-                // UNIFIED INPUT: Replaces click/touch with Pointer Events to stop ghost clicks
                 board.onpointerdown = (e) => {
                     const now = Date.now();
-                    if (now - state.lastInputTime < 400) return; // Ignore microsecond double-taps
+                    if (now - state.lastInputTime < 400) return;
                     state.lastInputTime = now;
                     handlePreview(e);
                     handleBoardClick(e);
@@ -235,10 +237,8 @@
             if (state.isAnimating || state.players[state.currentPlayer].magnets <= 0) { ghost.style.display = aura.style.display = 'none'; return; }
             const prevEnabled = state.currentPlayer === 0 ? document.getElementById('p1PrevCheck').checked : document.getElementById('p2PrevCheck').checked;
             if (!prevEnabled) { ghost.style.display = aura.style.display = 'none'; return; }
-            
             const rect = document.getElementById('gameBoard').getBoundingClientRect();
             const x = e.clientX - rect.left, y = e.clientY - rect.top;
-            
             ghost.style.display = aura.style.display = 'block';
             ghost.style.left = aura.style.left = `${(x / state.boardSize) * 100}%`;
             ghost.style.top = aura.style.top = `${(y / state.boardSize) * 100}%`;
@@ -255,14 +255,13 @@
             const x = e.clientX - rect.left, y = e.clientY - rect.top;
             const margin = getRad(1);
             if (x < margin || x > state.boardSize - margin || y < margin || y > state.boardSize - margin) return;
-            
             saveHistory();
             const newMag = { x, y, player: state.currentPlayer, size: 1, id: Date.now() };
             resolveMove(newMag, true);
         }
 
         function resolveMove(targetMag, isInitialClick) {
-            // Commit to board so it is visible
+            // FIX Issue 1: Add to board immediately so it renders with correct color first
             state.magnets.push(targetMag);
             render();
 
@@ -274,7 +273,6 @@
                 const tx = connections.reduce((s, m) => s + (m.x * m.size), 0) / totalW;
                 const ty = connections.reduce((s, m) => s + (m.y * m.size), 0) / totalW;
                 
-                // Active player triggered this, penalty assigned
                 state.players[isInitialClick ? state.currentPlayer : (state.currentPlayer === 0 ? 1 : 0)].score += totalW;
                 showToast(`Pull! ${totalW} Magnets`);
                 
@@ -283,6 +281,7 @@
                     state.currentPlayer = state.currentPlayer === 0 ? 1 : 0;
                 }
                 
+                // Start animation
                 animateAndMerge(connections, tx, ty, totalW);
             } else {
                 if (isInitialClick) {
@@ -301,8 +300,7 @@
                 added = false;
                 for (let i = 0; i < pool.length; i++) {
                     const p = pool[i];
-                    const dist = Math.sqrt((target.x - p.x)**2 + (target.y - p.y)**2);
-                    if (dist < (getRad(target.size)*FIELD_MUL + getRad(p.size)*FIELD_MUL)) {
+                    if (group.some(g => Math.sqrt((g.x - p.x)**2 + (g.y - p.y)**2) < (getRad(g.size)*FIELD_MUL + getRad(p.size)*FIELD_MUL))) {
                         group.push(p); pool.splice(i, 1); i--; added = true;
                     }
                 }
@@ -311,19 +309,31 @@
         }
 
         function animateAndMerge(cluster, tx, ty, totalSize) {
+            // FIX Issue 2: Force a browser paint break before enabling transitions
             requestAnimationFrame(() => {
-                cluster.forEach(c => {
-                    const mEl = document.querySelector(`[data-id="${c.id}"]`), fEl = document.querySelector(`[data-f-id="${c.id}"]`);
-                    if (mEl) { mEl.classList.add('vibrating'); mEl.style.left = `${(tx / state.boardSize) * 100}%`; mEl.style.top = `${(ty / state.boardSize) * 100}%`; }
-                    if (fEl) { fEl.style.left = `${(tx / state.boardSize) * 100}%`; fEl.style.top = `${(ty / state.boardSize) * 100}%`; }
-                });
+                requestAnimationFrame(() => {
+                    cluster.forEach(c => {
+                        const mEl = document.querySelector(`[data-id="${c.id}"]`), fEl = document.querySelector(`[data-f-id="${c.id}"]`);
+                        if (mEl) { 
+                            mEl.classList.add('moving', 'vibrating'); 
+                            mEl.style.left = `${(tx / state.boardSize) * 100}%`; 
+                            mEl.style.top = `${(ty / state.boardSize) * 100}%`; 
+                        }
+                        if (fEl) {
+                            fEl.classList.add('moving');
+                            fEl.style.left = `${(tx / state.boardSize) * 100}%`; 
+                            fEl.style.top = `${(ty / state.boardSize) * 100}%`; 
+                        }
+                    });
 
-                setTimeout(() => {
-                    const ids = cluster.map(m => m.id);
-                    state.magnets = state.magnets.filter(m => !ids.includes(m.id));
-                    const res = { x: tx, y: ty, player: (state.currentPlayer === 0 ? 1 : 0), size: totalSize, id: Date.now() };
-                    resolveMove(res, false); 
-                }, 2000);
+                    setTimeout(() => {
+                        const ids = cluster.map(m => m.id);
+                        state.magnets = state.magnets.filter(m => !ids.includes(m.id));
+                        const res = { x: tx, y: ty, player: (state.currentPlayer === 0 ? 1 : 0), size: totalSize, id: Date.now() };
+                        // Recurse
+                        resolveMove(res, false); 
+                    }, 2000);
+                });
             });
         }
 
