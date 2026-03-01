@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Magnetic Attraction Game</title>
     <style>
         :root {
@@ -14,25 +14,27 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0; padding: 10px;
+            margin: 0; padding: 0;
             background: radial-gradient(circle at center, #ffffff 0%, #dfe6e9 100%);
             color: var(--primary-text);
-            min-height: 100vh;
+            height: 100vh; width: 100vw;
             display: flex; flex-direction: column; align-items: center;
-            overflow-x: hidden;
+            overflow: hidden; 
+            /* Native Protection */
+            user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; 
+            touch-action: none; 
         }
 
         #toast {
             position: fixed; top: 20px; left: 50%;
             transform: translateX(-50%) translateY(-100px);
             background: #333; color: white; padding: 12px 24px;
-            border-radius: 30px; font-weight: bold; z-index: 2000;
+            border-radius: 30px; font-weight: bold; z-index: 5000;
             transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
         #toast.show { transform: translateX(-50%) translateY(0); }
 
-        /* --- Vibration Animation --- */
         @keyframes vibrate {
             0% { transform: translate(0, 0); }
             25% { transform: translate(3px, -3px); }
@@ -42,44 +44,26 @@
         }
         .vibrating .mag-inner { animation: vibrate 0.08s linear infinite; }
 
-        /* --- Screens & Panels --- */
         .setup-screen, .game-container {
             background: var(--panel-bg); backdrop-filter: blur(10px);
-            border-radius: 24px; padding: 25px;
+            border-radius: 24px; padding: 15px;
             box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
-            width: 95%; max-width: 600px; margin-bottom: 20px;
-            box-sizing: border-box;
+            width: 95%; max-width: 500px; box-sizing: border-box;
+            display: flex; flex-direction: column;
         }
+        .game-container { height: 98vh; margin: 1vh 0; }
 
-        .player-setup { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
-        @media (max-width: 480px) { .player-setup { grid-template-columns: 1fr; } }
+        .player-setup { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        .player-config { padding: 10px; background: rgba(0,0,0,0.03); border-radius: 12px; }
+        .color-options { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 5px; }
+        .color-option { aspect-ratio: 1; border-radius: 50%; border: 2px solid white; cursor: pointer; transition: transform 0.2s; }
+        .color-option.selected { border-color: #333; transform: scale(1.1); box-shadow: 0 0 8px rgba(0,0,0,0.2); }
 
-        .player-config { padding: 15px; background: rgba(0,0,0,0.03); border-radius: 15px; }
-        .color-options { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
-        .color-option { aspect-ratio: 1; border-radius: 50%; border: 2px solid white; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .color-option.selected { border-color: #333; transform: scale(1.1); }
-
-        /* --- UI Elements --- */
-        .color-indicator {
-            display: inline-block; width: 14px; height: 14px;
-            border-radius: 50%; margin-right: 8px;
-            border: 2px solid rgba(255,255,255,0.8);
-            vertical-align: middle; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-        }
-
-        .switch { position: relative; display: inline-block; width: 34px; height: 20px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; inset: 0; background-color: #ccc; transition: .4s; border-radius: 20px; }
-        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: var(--accent-wood); }
-        input:checked + .slider:before { transform: translateX(14px); }
-
-        /* --- Game Board --- */
-        .game-board-wrapper { margin: 10px auto; position: relative; }
-        .game-board { background: #fff; border: 4px solid var(--accent-wood); border-radius: 12px; position: relative; overflow: hidden; touch-action: none; }
+        .game-board-wrapper { flex-grow: 1; display: flex; justify-content: center; align-items: center; width: 100%; min-height: 0; margin: 10px 0; }
+        .game-board { background: #fff; border: 4px solid var(--accent-wood); border-radius: 12px; position: relative; overflow: hidden; }
 
         .magnet {
-            position: absolute; z-index: 5; transform: translate(-50%, -50%);
+            position: absolute; z-index: 10; transform: translate(-50%, -50%);
             transition: left 2s cubic-bezier(0.25, 0.1, 0.25, 1), top 2s cubic-bezier(0.25, 0.1, 0.25, 1);
         }
         .mag-inner {
@@ -93,18 +77,20 @@
         }
 
         #ghost-magnet, #ghost-aura { display: none; pointer-events: none; transition: none !important; }
-        #ghost-magnet { z-index: 10; opacity: 0.6; } 
 
-        .player-info { 
-            flex: 1; padding: 15px; border-radius: 18px; text-align: center; 
-            border: 2px solid transparent; transition: all 0.3s ease;
-        }
-        .player-info.active { border-color: var(--accent-wood); box-shadow: 0 8px 20px rgba(0,0,0,0.1); transform: translateY(-2px); }
+        .player-info { flex: 1; padding: 8px; border-radius: 15px; text-align: center; border: 2px solid transparent; transition: 0.3s; }
+        .player-info.active { border-color: var(--accent-wood); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
 
-        button { background: var(--accent-wood); color: white; border: none; padding: 12px 20px; border-radius: 12px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .switch { position: relative; display: inline-block; width: 30px; height: 18px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; inset: 0; background-color: #ccc; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--accent-wood); }
+        input:checked + .slider:before { transform: translateX(12px); }
 
-        .game-over { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 3000; color: white; }
+        button { background: var(--accent-wood); color: white; border: none; padding: 12px; border-radius: 12px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px; }
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .game-over { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 6000; color: white; padding: 20px; }
     </style>
 </head>
 <body>
@@ -112,44 +98,34 @@
     <div id="toast">Message</div>
 
     <div class="setup-screen" id="setupScreen">
-        <h2 style="text-align:center">🧲 Magnetic Attraction</h2>
+        <h2 style="text-align:center; margin: 0 0 10px 0;">🧲 Magnetic Attraction</h2>
         <div class="player-setup" id="setupContainer"></div>
-        <div style="margin: 20px 0;">
-            <label>Magnets per player: <b id="magVal">8</b></label>
-            <input type="range" id="magSlider" min="5" max="25" value="8" style="width:100%">
+        <div style="margin-bottom: 15px;">
+            <label style="font-weight:bold;">Magnets: <b id="magVal">8</b></label>
+            <input type="range" id="magSlider" min="5" max="25" value="8" style="width:100%; margin-top:5px;">
         </div>
         <button onclick="startGame()">Start Game</button>
     </div>
 
     <div class="game-container" id="gameContainer" style="display:none">
-        <div class="game-info" style="display:flex; justify-content:space-between; gap:10px; margin-bottom:15px;">
+        <div class="game-info" style="display:flex; justify-content:space-between; gap:10px;">
             <div id="p1Stat" class="player-info">
-                <div style="font-weight:bold; display:flex; align-items:center; justify-content:center; margin-bottom:5px;">
-                    <span id="p1ColorDot" class="color-indicator"></span>
-                    <span id="p1NameLabel">Player 1</span>
-                </div>
-                <div id="p1Count">Magnets: 8</div>
-                <div id="p1Score">Penalty: 0</div>
-                <div style="margin-top:8px; font-size:0.75em; display:flex; align-items:center; justify-content:center; gap:8px; color:rgba(0,0,0,0.6);">
+                <b id="p1NameLabel">P1</b>
+                <div style="font-size: 0.8em;">M: <span id="p1Count">8</span> | P: <span id="p1Score">0</span></div>
+                <div style="margin-top:4px; font-size:0.65em; display:flex; align-items:center; justify-content:center; gap:4px;">
                     <span>Preview</span>
                     <label class="switch"><input type="checkbox" id="p1PrevCheck" checked><span class="slider"></span></label>
                 </div>
             </div>
             <div id="p2Stat" class="player-info">
-                <div style="font-weight:bold; display:flex; align-items:center; justify-content:center; margin-bottom:5px;">
-                    <span id="p2ColorDot" class="color-indicator"></span>
-                    <span id="p2NameLabel">Player 2</span>
-                </div>
-                <div id="p2Count">Magnets: 8</div>
-                <div id="p2Score">Penalty: 0</div>
-                <div style="margin-top:8px; font-size:0.75em; display:flex; align-items:center; justify-content:center; gap:8px; color:rgba(0,0,0,0.6);">
+                <b id="p2NameLabel">P2</b>
+                <div style="font-size: 0.8em;">M: <span id="p2Count">8</span> | P: <span id="p2Score">0</span></div>
+                <div style="margin-top:4px; font-size:0.65em; display:flex; align-items:center; justify-content:center; gap:4px;">
                     <span>Preview</span>
                     <label class="switch"><input type="checkbox" id="p2PrevCheck" checked><span class="slider"></span></label>
                 </div>
             </div>
         </div>
-
-        <div id="gameStatus" style="text-align:center; font-weight:bold; margin-bottom:10px; color:#636e72;">Ready!</div>
 
         <div class="game-board-wrapper" id="boardWrapper">
             <div class="game-board" id="gameBoard">
@@ -160,236 +136,196 @@
 
         <div style="display:flex; gap:10px;">
             <button id="undoBtn" onclick="undoMove()" style="flex:1">Undo Move</button>
-            <button onclick="location.reload()" style="background:#636e72; flex:1">Reset Game</button>
+            <button onclick="location.reload()" style="background:#636e72; flex:1">Reset</button>
         </div>
     </div>
 
     <div class="game-over" id="gameOverModal">
         <h1 id="winnerText"></h1>
-        <p id="finalScores"></p>
-        <button onclick="location.reload()" style="width: auto; padding: 15px 40px;">Play Again</button>
+        <p id="finalScores" style="font-size: 1.1em; margin-bottom: 20px;"></p>
+        <button onclick="location.reload()" style="width: auto; padding: 12px 30px;">New Game</button>
     </div>
 
     <script>
-        /**
-         * CORE STATE
-         */
+        const BASE_UNIT = 22; 
+        const FIELD_MUL = 4;
+
         let state = {
-            players: [
-                { name: "Player 1", color: "#ff6b6b", score: 0, magnets: 8 },
-                { name: "Player 2", color: "#4ecdc4", score: 0, magnets: 8 }
-            ],
-            currentPlayer: 0,
-            magnets: [],
-            history: [],
-            isAnimating: false,
-            totalMagnets: 8,
-            boardSize: 400,
-            unitScale: 1
+            players: [{ name: "Player 1", color: "#ff6b6b", score: 0, magnets: 8 }, { name: "Player 2", color: "#4ecdc4", score: 0, magnets: 8 }],
+            currentPlayer: 0, magnets: [], history: [], isAnimating: false, totalMagnets: 8, boardSize: 400, unitScale: 1
         };
 
-        /**
-         * FIX: SETUP LOGIC
-         * We build the string first to avoid innerHTML wiping Player 1's listeners.
-         */
+        function getRad(size) { return (Math.sqrt(size) * BASE_UNIT * state.unitScale) / 2; }
+
         function initSetup() {
             const container = document.getElementById('setupContainer');
             const colors = ['#ff6b6b', '#74b9ff', '#a29bfe', '#fd79a8', '#fdcb6e', '#00b894', '#e17055', '#4ecdc4'];
-            
-            let setupHtml = '';
+            let html = '';
             state.players.forEach((p, i) => {
-                setupHtml += `
-                    <div class="player-config">
-                        <label style="font-size:0.8em; color:#666; font-weight:bold;">Name:</label>
-                        <input type="text" id="p${i}Name" value="${p.name}" placeholder="Enter Name" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box;">
-                        <div class="color-options" id="p${i}Colors">
-                            ${colors.map(c => `<div class="color-option ${p.color === c ? 'selected' : ''}" data-color="${c}" style="background-color:${c}"></div>`).join('')}
-                        </div>
-                    </div>`;
+                html += `<div class="player-config">
+                    <input type="text" class="p-name-in" data-idx="${i}" value="${p.name}" style="width:100%; padding:6px; margin-bottom:8px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box;">
+                    <div class="color-options">${colors.map(c => `<div class="color-option ${p.color === c ? 'selected' : ''}" data-player="${i}" data-color="${c}" style="background-color:${c}"></div>`).join('')}</div>
+                </div>`;
             });
-            container.innerHTML = setupHtml;
-
-            // Now that HTML is stable, attach listeners
-            state.players.forEach((p, i) => {
-                const colorOptions = document.getElementById(`p${i}Colors`).querySelectorAll('.color-option');
-                colorOptions.forEach(opt => {
-                    opt.onclick = () => {
-                        state.players[i].color = opt.dataset.color;
-                        colorOptions.forEach(o => o.classList.remove('selected'));
-                        opt.classList.add('selected');
-                    };
-                });
+            container.innerHTML = html;
+            document.querySelectorAll('.p-name-in').forEach(el => el.oninput = (e) => state.players[e.target.dataset.idx].name = e.target.value);
+            document.querySelectorAll('.color-option').forEach(el => el.onclick = () => {
+                const idx = el.dataset.player; state.players[idx].color = el.dataset.color;
+                el.parentElement.querySelectorAll('.color-option').forEach(o => o.classList.remove('selected'));
+                el.classList.add('selected');
             });
-
             document.getElementById('magSlider').oninput = function() {
-                document.getElementById('magVal').innerText = this.value;
                 state.totalMagnets = parseInt(this.value);
+                document.getElementById('magVal').innerText = this.value;
             };
         }
 
         function calculateBoardSize() {
-            const size = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.55);
+            const wrapper = document.getElementById('boardWrapper');
+            const size = Math.min(wrapper.offsetWidth, wrapper.offsetHeight) - 10;
             state.boardSize = size;
             state.unitScale = size / 400;
-            const board = document.getElementById('gameBoard'), wrapper = document.getElementById('boardWrapper');
-            board.style.width = board.style.height = wrapper.style.width = `${size}px`;
-        }
-
-        function showToast(msg) {
-            const t = document.getElementById('toast');
-            t.innerText = msg; t.classList.add('show');
-            setTimeout(() => t.classList.remove('show'), 1500);
+            const board = document.getElementById('gameBoard');
+            board.style.width = board.style.height = `${size}px`;
         }
 
         function startGame() {
-            calculateBoardSize();
-            state.players[0].name = document.getElementById('p0Name').value || "Player 1";
-            state.players[1].name = document.getElementById('p1Name').value || "Player 2";
-            state.players[0].magnets = state.players[1].magnets = state.totalMagnets;
             document.getElementById('setupScreen').style.display = 'none';
-            document.getElementById('gameContainer').style.display = 'block';
-            updateUI();
-            const board = document.getElementById('gameBoard');
-            board.onclick = handleBoardClick;
-            board.onmousemove = handlePreview;
+            document.getElementById('gameContainer').style.display = 'flex';
+            setTimeout(() => {
+                calculateBoardSize();
+                state.players[0].magnets = state.players[1].magnets = state.totalMagnets;
+                updateUI();
+                const board = document.getElementById('gameBoard');
+                board.onclick = handleBoardClick;
+                board.onmousemove = handlePreview;
+                board.ontouchstart = (e) => { const touch = e.touches[0]; handlePreview(touch); handleBoardClick(touch); };
+            }, 50);
         }
 
         function updateUI() {
             const p1 = state.players[0], p2 = state.players[1];
             document.getElementById('p1NameLabel').innerText = p1.name;
             document.getElementById('p2NameLabel').innerText = p2.name;
-            document.getElementById('p1ColorDot').style.backgroundColor = p1.color;
-            document.getElementById('p2ColorDot').style.backgroundColor = p2.color;
             document.getElementById('p1Stat').style.backgroundColor = p1.color + '26';
             document.getElementById('p2Stat').style.backgroundColor = p2.color + '26';
-            document.getElementById('p1Count').innerText = `Magnets: ${p1.magnets}`;
-            document.getElementById('p1Score').innerText = `Penalty: ${p1.score}`;
-            document.getElementById('p2Count').innerText = `Magnets: ${p2.magnets}`;
-            document.getElementById('p2Score').innerText = `Penalty: ${p2.score}`;
+            document.getElementById('p1Count').innerText = p1.magnets;
+            document.getElementById('p1Score').innerText = p1.score;
+            document.getElementById('p2Count').innerText = p2.magnets;
+            document.getElementById('p2Score').innerText = p2.score;
             document.getElementById('p1Stat').classList.toggle('active', state.currentPlayer === 0);
             document.getElementById('p2Stat').classList.toggle('active', state.currentPlayer === 1);
-            
-            const curPlayer = state.players[state.currentPlayer];
-            document.getElementById('gameStatus').innerText = curPlayer.magnets > 0 ? `${curPlayer.name}'s Turn` : "Wait for Equilibrium...";
             document.getElementById('undoBtn').disabled = state.history.length === 0 || state.isAnimating;
         }
 
         function handlePreview(e) {
             const ghost = document.getElementById('ghost-magnet'), aura = document.getElementById('ghost-aura');
-            if (state.isAnimating || state.players[state.currentPlayer].magnets <= 0) { 
-                ghost.style.display = aura.style.display = 'none'; return; 
-            }
+            if (state.isAnimating || state.players[state.currentPlayer].magnets <= 0) { ghost.style.display = aura.style.display = 'none'; return; }
             const prevEnabled = state.currentPlayer === 0 ? document.getElementById('p1PrevCheck').checked : document.getElementById('p2PrevCheck').checked;
             if (!prevEnabled) { ghost.style.display = aura.style.display = 'none'; return; }
-            const rect = e.currentTarget.getBoundingClientRect();
+            const rect = document.getElementById('gameBoard').getBoundingClientRect();
             const x = e.clientX - rect.left, y = e.clientY - rect.top;
             ghost.style.display = aura.style.display = 'block';
             ghost.style.left = aura.style.left = `${(x / state.boardSize) * 100}%`;
             ghost.style.top = aura.style.top = `${(y / state.boardSize) * 100}%`;
-            const color = state.players[state.currentPlayer].color;
-            ghost.querySelector('.mag-inner').style.backgroundColor = color;
-            ghost.style.width = ghost.style.height = `${20 * state.unitScale}px`;
-            aura.style.backgroundColor = color + '33';
-            aura.style.width = aura.style.height = `${80 * state.unitScale}px`;
+            ghost.querySelector('.mag-inner').style.backgroundColor = state.players[state.currentPlayer].color;
+            const r = getRad(1);
+            ghost.style.width = ghost.style.height = `${r * 2}px`;
+            aura.style.backgroundColor = state.players[state.currentPlayer].color + '33';
+            aura.style.width = aura.style.height = `${r * 2 * FIELD_MUL}px`;
         }
 
         function handleBoardClick(e) {
-            if (state.isAnimating) return;
-            if (state.players[state.currentPlayer].magnets <= 0) return;
-            const rect = e.currentTarget.getBoundingClientRect();
+            if (state.isAnimating || state.players[state.currentPlayer].magnets <= 0) return;
+            const rect = document.getElementById('gameBoard').getBoundingClientRect();
             const x = e.clientX - rect.left, y = e.clientY - rect.top;
-            const margin = 10 * state.unitScale;
+            const margin = getRad(1);
             if (x < margin || x > state.boardSize - margin || y < margin || y > state.boardSize - margin) return;
+            
+            // UNDO LOGIC: Snapshot the state BEFORE the move starts
             saveHistory();
-            processMove({ x, y, player: state.currentPlayer, size: 1, id: Date.now() });
+
+            const newMag = { x, y, player: state.currentPlayer, size: 1, id: Date.now() };
+            resolveMove(newMag, true);
+        }
+
+        /**
+         * UPDATED RECURSIVE ENGINE: Fixes visibility and chain sequence
+         */
+        function resolveMove(targetMag, isInitialClick) {
+            // STEP 1: Add the magnet to the board's memory first so it is rendered
+            state.magnets.push(targetMag);
+            render();
+
+            // STEP 2: Find what it touches
+            let connections = findInstantConnections(targetMag, state.magnets);
+            
+            if (connections.length > 1) {
+                state.isAnimating = true;
+                const totalW = connections.reduce((s, m) => s + m.size, 0);
+                const tx = connections.reduce((s, m) => s + (m.x * m.size), 0) / totalW;
+                const ty = connections.reduce((s, m) => s + (m.y * m.size), 0) / totalW;
+                
+                // Active player gets penalty
+                state.players[isInitialClick ? state.currentPlayer : (state.currentPlayer === 0 ? 1 : 0)].score += totalW;
+                showToast(`Pull! ${totalW} Magnets`);
+                
+                if (isInitialClick) {
+                    state.players[state.currentPlayer].magnets--;
+                    state.currentPlayer = state.currentPlayer === 0 ? 1 : 0;
+                }
+                
+                // Trigger the 2-second slide
+                animateAndMerge(connections, tx, ty, totalW);
+            } else {
+                // No connection: Move finished
+                if (isInitialClick) {
+                    state.players[state.currentPlayer].magnets--;
+                    state.currentPlayer = state.currentPlayer === 0 ? 1 : 0;
+                }
+                state.isAnimating = false;
+                updateUI();
+                setTimeout(() => checkEnd(), 500);
+            }
         }
 
         function findInstantConnections(target, list) {
-            let group = [target];
-            let pool = [...list];
-            let added = true;
+            let group = [target], pool = list.filter(m => m.id !== target.id), added = true;
             while (added) {
                 added = false;
                 for (let i = 0; i < pool.length; i++) {
                     const p = pool[i];
-                    const hit = group.some(g => {
-                        const d = Math.sqrt((g.x - p.x)**2 + (g.y - p.y)**2);
-                        const r1 = (g.size > 1 ? 15 : 10) * 4 * state.unitScale;
-                        const r2 = (p.size > 1 ? 15 : 10) * 4 * state.unitScale;
-                        return d < (r1 + r2);
-                    });
-                    if (hit) { group.push(p); pool.splice(i, 1); i--; added = true; }
+                    if (group.some(g => {
+                        const dist = Math.sqrt((g.x - p.x)**2 + (g.y - p.y)**2);
+                        return dist < (getRad(g.size)*FIELD_MUL + getRad(p.size)*FIELD_MUL);
+                    })) {
+                        group.push(p); pool.splice(i, 1); i--; added = true;
+                    }
                 }
             }
             return group;
         }
 
-        function processMove(newMag) {
-            let cluster = findInstantConnections(newMag, state.magnets);
-            if (cluster.length > 1) {
-                state.isAnimating = true;
-                const totalW = cluster.reduce((s, m) => s + m.size, 0);
-                const tx = cluster.reduce((s, m) => s + (m.x * m.size), 0) / totalW;
-                const ty = cluster.reduce((s, m) => s + (m.y * m.size), 0) / totalW;
-                state.players[state.currentPlayer].score += totalW;
-                showToast(`Magnetic Pull! ${totalW} Magnets`);
-                state.magnets.push(cluster[0]);
-                animateMerge(cluster, tx, ty, totalW, true);
-            } else {
-                state.magnets.push(newMag);
-                render();
-                setTimeout(() => checkGameOver(), 100);
-            }
-            state.players[state.currentPlayer].magnets--;
-            state.currentPlayer = state.currentPlayer === 0 ? 1 : 0;
-            updateUI();
-        }
-
-        /**
-         * FIX: ANIMATE MERGE
-         * Added updateUI() at completion to enable the Undo button.
-         */
-        function animateMerge(cluster, tx, ty, totalSize, isFirstPull) {
-            render(); 
+        function animateAndMerge(cluster, tx, ty, totalSize) {
+            // Frame pause to ensure the browser has registered the existence of all magnets
             requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    cluster.forEach(c => {
-                        const mEl = document.querySelector(`[data-id="${c.id}"]`);
-                        const fEl = document.querySelector(`[data-f-id="${c.id}"]`);
-                        if (mEl) { 
-                            mEl.classList.add('vibrating'); 
-                            mEl.style.left = `${(tx / state.boardSize) * 100}%`; 
-                            mEl.style.top = `${(ty / state.boardSize) * 100}%`; 
-                        }
-                        if (fEl) { fEl.style.left = `${(tx / state.boardSize) * 100}%`; fEl.style.top = `${(ty / state.boardSize) * 100}%`; }
-                    });
-
-                    setTimeout(() => {
-                        cluster.forEach(c => {
-                            const idx = state.magnets.findIndex(m => m.id === c.id);
-                            if (idx > -1) state.magnets.splice(idx, 1);
-                        });
-
-                        const resultingCluster = { x: tx, y: ty, player: (state.currentPlayer === 0 ? 1 : 0), size: totalSize, id: Date.now() };
-                        let nextGroup = findInstantConnections(resultingCluster, state.magnets);
-                        
-                        if (nextGroup.length > 1) {
-                            const nextTotalW = nextGroup.reduce((s, m) => s + m.size, 0);
-                            const ntx = nextGroup.reduce((s, m) => s + (m.x * m.size), 0) / nextTotalW;
-                            const nty = nextGroup.reduce((s, m) => s + (m.y * m.size), 0) / nextTotalW;
-                            state.players[state.currentPlayer === 0 ? 1 : 0].score += (nextTotalW - totalSize);
-                            showToast(`Chain Merge! Total: ${nextTotalW}`);
-                            state.magnets.push(nextGroup[0]); 
-                            animateMerge(nextGroup, ntx, nty, nextTotalW, false);
-                        } else {
-                            state.magnets.push(resultingCluster);
-                            state.isAnimating = false; // FIX: Button re-enables on next updateUI
-                            render();
-                            updateUI(); // Added Refresh
-                            setTimeout(() => checkGameOver(), 500);
-                        }
-                    }, 2000); 
+                cluster.forEach(c => {
+                    const mEl = document.querySelector(`[data-id="${c.id}"]`), fEl = document.querySelector(`[data-f-id="${c.id}"]`);
+                    if (mEl) { mEl.classList.add('vibrating'); mEl.style.left = `${(tx / state.boardSize) * 100}%`; mEl.style.top = `${(ty / state.boardSize) * 100}%`; }
+                    if (fEl) { fEl.style.left = `${(tx / state.boardSize) * 100}%`; fEl.style.top = `${(ty / state.boardSize) * 100}%`; }
                 });
+
+                setTimeout(() => {
+                    // Pull complete. Cleanup originals
+                    const ids = cluster.map(m => m.id);
+                    state.magnets = state.magnets.filter(m => !ids.includes(m.id));
+                    
+                    // Create the NEW resulting cluster
+                    const res = { x: tx, y: ty, player: (state.currentPlayer === 0 ? 1 : 0), size: totalSize, id: Date.now() };
+                    
+                    // Recursion check: will this new cluster touch someone else?
+                    resolveMove(res, false); 
+                }, 2000);
             });
         }
 
@@ -398,44 +334,62 @@
             const ghostM = document.getElementById('ghost-magnet'), ghostA = document.getElementById('ghost-aura');
             board.innerHTML = ''; board.appendChild(ghostM); board.appendChild(ghostA);
             state.magnets.forEach(m => {
-                const p = state.players[m.player], vSize = (m.size > 1 ? 30 : 20) * state.unitScale;
-                const fieldRadius = (m.size > 1 ? 15 : 10) * 4 * state.unitScale;
+                const r = getRad(m.size), color = state.players[m.player].color;
                 const f = document.createElement('div');
                 f.className = 'magnetic-field'; f.setAttribute('data-f-id', m.id);
-                f.style.width = f.style.height = `${fieldRadius * 2}px`;
+                f.style.width = f.style.height = (r * 2 * FIELD_MUL) + 'px';
                 f.style.left = `${(m.x / state.boardSize) * 100}%`; f.style.top = `${(m.y / state.boardSize) * 100}%`;
-                f.style.backgroundColor = p.color + '4D'; f.style.border = `1px solid ${p.color}66`;
+                f.style.backgroundColor = color + '4D'; f.style.border = `1px solid ${color}66`;
                 board.appendChild(f);
                 const el = document.createElement('div');
                 el.className = 'magnet'; el.setAttribute('data-id', m.id);
-                el.style.width = el.style.height = `${vSize}px`;
+                el.style.width = el.style.height = (r * 2) + 'px';
                 el.style.left = `${(m.x / state.boardSize) * 100}%`; el.style.top = `${(m.y / state.boardSize) * 100}%`;
-                el.innerHTML = `<div class="mag-inner" style="background-color:${p.color}">${m.size > 1 ? m.size : ''}</div>`;
+                el.innerHTML = `<div class="mag-inner" style="background-color:${color}">${m.size > 1 ? m.size : ''}</div>`;
                 board.appendChild(el);
             });
         }
 
+        /**
+         * UNDO FIX: Restores complete snapshot and stops all animations
+         */
         function saveHistory() { 
-            state.history.push(JSON.stringify({ players: state.players.map(p => ({...p})), currentPlayer: state.currentPlayer, magnets: state.magnets.map(m => ({...m})) })); 
-            if (state.history.length > 20) state.history.shift(); 
+            state.history.push(JSON.stringify({ 
+                players: state.players.map(p => ({...p})), 
+                currentPlayer: state.currentPlayer, 
+                magnets: state.magnets.map(m => ({...m})) 
+            })); 
+            if (state.history.length > 25) state.history.shift(); 
         }
 
         function undoMove() { 
             if (state.history.length === 0 || state.isAnimating) return; 
-            const prev = JSON.parse(state.history.pop()); 
-            state.players = prev.players; state.currentPlayer = prev.currentPlayer; state.magnets = prev.magnets; 
-            render(); updateUI(); showToast("Move Undone");
+            const restored = JSON.parse(state.history.pop());
+            state.players = restored.players;
+            state.currentPlayer = restored.currentPlayer;
+            state.magnets = restored.magnets;
+            state.isAnimating = false; // Important: Clear animation lock
+            render(); 
+            updateUI(); 
+            showToast("Undone");
         }
         
-        function checkGameOver() { 
-            if (state.players[0].magnets <= 0 && state.players[1].magnets <= 0 && !state.isAnimating) { 
-                const p1 = state.players[0], p2 = state.players[1]; 
-                let winnerText = (p1.score < p2.score) ? p1.name + " Wins!" : (p2.score < p1.score) ? p2.name + " Wins!" : "It's a Tie!";
-                document.getElementById('winnerText').innerText = winnerText; 
-                document.getElementById('finalScores').innerText = `${p1.name}: ${p1.score} | ${p2.name}: ${p2.score}`;
-                document.getElementById('gameOverModal').style.display = 'flex'; 
-            } 
+        function checkEnd() {
+            if (state.players[0].magnets <= 0 && state.players[1].magnets <= 0 && !state.isAnimating) {
+                const p1 = state.players[0], p2 = state.players[1];
+                let win = (p1.score < p2.score) ? p1.name + " Wins!" : (p2.score < p1.score) ? p2.name + " Wins!" : "Tie!";
+                document.getElementById('winnerText').innerText = win;
+                document.getElementById('finalScores').innerText = `${p1.name}: ${p1.score}\n${p2.name}: ${p2.score}`;
+                document.getElementById('gameOverModal').style.display = 'flex';
+            }
         }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg; t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 1500);
+        }
+
         window.onload = initSetup;
     </script>
 </body>
